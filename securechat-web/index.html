@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="theme-color" content="#0a0c12"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>SecureChat 🔐</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<style>
+:root {
+  --bg:       #0a0c12;
+  --bg2:      #12151f;
+  --bg3:      #1a1e2e;
+  --bg4:      #222840;
+  --accent:   #00e5b0;
+  --accent2:  #3d8bff;
+  --red:      #ff4f6d;
+  --gold:     #ffc94d;
+  --text:     #e8eaf6;
+  --dim:      #5a6075;
+  --own-bg:   #0d2e22;
+  --own-border: #00e5b0;
+  --msg-bg:   #181c2a;
+  --radius:   16px;
+  --font-main: 'DM Sans', sans-serif;
+  --font-mono: 'Space Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: var(--font-main);
+  background: var(--bg);
+  color: var(--text);
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── LOGIN SCREEN ─────────────────────────────── */
+#login-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100dvh;
+  padding: 24px;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+}
+
+#login-screen::before {
+  content: '';
+  position: absolute;
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(0,229,176,0.08) 0%, transparent 70%);
+  top: -100px; left: 50%; transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.login-card {
+  width: 100%; max-width: 400px;
+  background: var(--bg2);
+  border: 1px solid var(--bg4);
+  border-radius: 24px;
+  padding: 36px 28px;
+  position: relative;
+  z-index: 1;
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.logo-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 8px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.logo-title {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -1px;
+}
+
+.logo-sub {
+  font-size: 12px;
+  color: var(--dim);
+  margin-top: 4px;
+  letter-spacing: 0.5px;
+}
+
+.field-group { margin-bottom: 16px; }
+
+.field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.field-input {
+  width: 100%;
+  background: var(--bg3);
+  border: 1.5px solid var(--bg4);
+  border-radius: 12px;
+  padding: 13px 16px;
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.field-input:focus { border-color: var(--accent); }
+.field-input::placeholder { color: var(--dim); }
+
+.room-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.chip {
+  padding: 6px 14px;
+  background: var(--bg3);
+  border: 1.5px solid var(--bg4);
+  border-radius: 20px;
+  font-size: 12px;
+  color: var(--dim);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font-mono);
+}
+
+.chip:hover, .chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0,229,176,0.08);
+}
+
+.connect-btn {
+  width: 100%;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 14px;
+  padding: 15px;
+  font-family: var(--font-main);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.connect-btn:hover { background: #00c89a; transform: translateY(-1px); }
+.connect-btn:active { transform: translateY(0); }
+
+.connect-btn.loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.error-msg {
+  color: var(--red);
+  font-size: 13px;
+  text-align: center;
+  margin-top: 10px;
+  min-height: 18px;
+}
+
+/* ── CHAT SCREEN ──────────────────────────────── */
+#chat-screen {
+  display: none;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+/* Top bar */
+.topbar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--bg3);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.topbar-menu-btn {
+  background: none;
+  border: none;
+  color: var(--dim);
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+.topbar-info { flex: 1; }
+
+.topbar-room {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.topbar-status {
+  font-size: 11px;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.topbar-status::before {
+  content: '●';
+  font-size: 8px;
+}
+
+.encrypt-badge {
+  background: rgba(0,229,176,0.1);
+  border: 1px solid rgba(0,229,176,0.3);
+  color: var(--accent);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+/* Sidebar */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 100;
+  backdrop-filter: blur(2px);
+}
+
+.sidebar-overlay.open { display: block; }
+
+.sidebar {
+  position: fixed;
+  top: 0; left: -280px;
+  width: 280px;
+  height: 100dvh;
+  background: var(--bg2);
+  border-right: 1px solid var(--bg3);
+  z-index: 101;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.sidebar.open { left: 0; }
+
+.sidebar-header {
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid var(--bg3);
+}
+
+.sidebar-logo {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.sidebar-user {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: #000;
+  flex-shrink: 0;
+}
+
+.user-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.user-status {
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.sidebar-section {
+  padding: 16px 20px 8px;
+}
+
+.section-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 8px;
+}
+
+.room-btn {
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--dim);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.room-btn:hover { background: var(--bg3); color: var(--text); }
+.room-btn.active { background: rgba(0,229,176,0.1); color: var(--accent); }
+
+.member-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.member-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.member-name {
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* Messages */
+.messages-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  scroll-behavior: smooth;
+}
+
+.messages-wrap::-webkit-scrollbar { width: 3px; }
+.messages-wrap::-webkit-scrollbar-track { background: transparent; }
+.messages-wrap::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+
+.system-msg {
+  text-align: center;
+  font-size: 11px;
+  color: var(--dim);
+  padding: 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.system-msg::before, .system-msg::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--bg3);
+}
+
+.msg-row {
+  display: flex;
+  flex-direction: column;
+  max-width: 80%;
+  animation: msgIn 0.2s ease-out;
+}
+
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.msg-row.own { align-self: flex-end; align-items: flex-end; }
+.msg-row.other { align-self: flex-start; align-items: flex-start; }
+
+.msg-meta {
+  font-size: 10px;
+  color: var(--dim);
+  margin-bottom: 3px;
+  padding: 0 4px;
+  display: flex;
+  gap: 6px;
+}
+
+.msg-sender { font-weight: 600; color: var(--accent2); }
+.msg-row.own .msg-sender { color: var(--accent); }
+
+.msg-bubble {
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+  position: relative;
+}
+
+.msg-row.own .msg-bubble {
+  background: var(--own-bg);
+  border: 1px solid rgba(0,229,176,0.2);
+  border-bottom-right-radius: 4px;
+  color: var(--text);
+}
+
+.msg-row.other .msg-bubble {
+  background: var(--msg-bg);
+  border: 1px solid var(--bg4);
+  border-bottom-left-radius: 4px;
+}
+
+.encrypted-tag {
+  font-size: 9px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  opacity: 0.6;
+  margin-top: 3px;
+  display: block;
+}
+
+/* File card */
+.file-card {
+  background: var(--bg3);
+  border: 1px solid var(--bg4);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 280px;
+  animation: msgIn 0.2s ease-out;
+  align-self: flex-start;
+}
+
+.file-card.own { align-self: flex-end; }
+
+.file-icon { font-size: 28px; flex-shrink: 0; }
+
+.file-info { flex: 1; min-width: 0; }
+
+.file-name {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-size { font-size: 11px; color: var(--dim); margin-top: 2px; }
+
+.file-dl-btn {
+  background: var(--accent2);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.file-dl-btn:hover { background: #2a6be0; }
+
+/* Typing indicator */
+.typing-indicator {
+  font-size: 12px;
+  color: var(--dim);
+  padding: 0 16px 4px;
+  height: 20px;
+  flex-shrink: 0;
+  font-style: italic;
+}
+
+/* Input area */
+.input-area {
+  background: var(--bg2);
+  border-top: 1px solid var(--bg3);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 10px;
+  color: var(--dim);
+  transition: all 0.2s;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover { background: var(--bg3); color: var(--text); }
+
+.msg-input {
+  flex: 1;
+  background: var(--bg3);
+  border: 1.5px solid var(--bg4);
+  border-radius: 22px;
+  padding: 10px 16px;
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+  resize: none;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.msg-input:focus { border-color: var(--accent); }
+.msg-input::placeholder { color: var(--dim); }
+
+.send-btn {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 50%;
+  width: 42px; height: 42px;
+  font-size: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.send-btn:hover { background: #00c89a; transform: scale(1.05); }
+.send-btn:active { transform: scale(0.95); }
+
+/* Video call modal */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(4px);
+}
+
+.modal-overlay.open { display: flex; }
+
+.video-modal {
+  background: var(--bg2);
+  border: 1px solid var(--bg3);
+  border-radius: 24px;
+  width: 100%;
+  max-width: 500px;
+  overflow: hidden;
+}
+
+.video-header {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--bg3);
+}
+
+.video-title {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.video-live {
+  font-size: 11px;
+  color: var(--red);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.live-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  animation: blink 1s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.video-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 12px;
+}
+
+.video-box {
+  background: #000;
+  border-radius: 14px;
+  aspect-ratio: 4/3;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-box video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.video-label {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  backdrop-filter: blur(4px);
+}
+
+.video-placeholder {
+  color: var(--dim);
+  font-size: 13px;
+  text-align: center;
+  padding: 16px;
+}
+
+.video-controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 16px 20px;
+}
+
+.ctrl-btn {
+  background: var(--bg3);
+  border: none;
+  border-radius: 50%;
+  width: 50px; height: 50px;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ctrl-btn:hover { background: var(--bg4); }
+.ctrl-btn.off { background: var(--bg4); color: var(--dim); }
+.ctrl-btn.end { background: var(--red); color: #fff; }
+.ctrl-btn.end:hover { background: #e0304a; }
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--bg3);
+  border: 1px solid var(--bg4);
+  color: var(--text);
+  font-size: 13px;
+  padding: 10px 20px;
+  border-radius: 20px;
+  z-index: 300;
+  opacity: 0;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* History items */
+.hist-item {
+  background: var(--bg3);
+  border: 1px solid var(--bg4);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+.hist-sender {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent2);
+  margin-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+}
+.hist-sender span { color: var(--dim); font-weight: 400; }
+.hist-text { font-size: 13px; color: var(--text); line-height: 1.4; }
+.hist-enc { font-size: 10px; color: var(--accent); font-family: var(--font-mono); margin-top: 4px; }
+.stat-card {
+  background: var(--bg3);
+  border: 1px solid var(--bg4);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.stat-label { font-size: 12px; color: var(--dim); }
+.stat-value { font-size: 22px; font-weight: 700; color: var(--accent); font-family: var(--font-mono); }
+
+/* Responsive */
+@media (min-width: 768px) {
+  #chat-screen { flex-direction: row; }
+  .sidebar {
+    position: static;
+    width: 260px;
+    border-right: 1px solid var(--bg3);
+  }
+  .sidebar.open { left: 0; }
+  .sidebar-overlay { display: none !important; }
+  .topbar-menu-btn { display: none; }
+  .main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+}
+
+.main-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN SCREEN ───────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="logo-icon">🔐</span>
+      <div class="logo-title">SecureChat</div>
+      <div class="logo-sub">End-to-End Encrypted · AES-256</div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Server URL</label>
+      <input class="field-input" id="server-url" type="text"
+             placeholder="https://your-server.railway.app"
+             value=""/>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Username</label>
+      <input class="field-input" id="username" type="text" placeholder="Enter your name" maxlength="20"/>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Room</label>
+      <input class="field-input" id="room-input" type="text" placeholder="Room name" value="general"/>
+      <div class="room-chips" id="room-chips">
+        <div class="chip active" onclick="selectRoom('general')"># general</div>
+        <div class="chip" onclick="selectRoom('tech')"># tech</div>
+        <div class="chip" onclick="selectRoom('random')"># random</div>
+        <div class="chip" onclick="selectRoom('private')"># private</div>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Room Password</label>
+      <input class="field-input" id="password" type="password" placeholder="Shared password"/>
+    </div>
+
+    <button class="connect-btn" id="connect-btn" onclick="connect()">
+      Connect Securely →
+    </button>
+    <div class="error-msg" id="error-msg"></div>
+  </div>
+</div>
+
+<!-- ── CHAT SCREEN ────────────────────────────── -->
+<div id="chat-screen">
+
+  <!-- Sidebar overlay -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">🔐 SecureChat</div>
+      <div class="sidebar-user">
+        <div class="avatar" id="sidebar-avatar">?</div>
+        <div>
+          <div class="user-name" id="sidebar-username">—</div>
+          <div class="user-status">● Online</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-title">Rooms</div>
+      <button class="room-btn active" onclick="switchRoom('general')"># general</button>
+      <button class="room-btn" onclick="switchRoom('tech')"># tech</button>
+      <button class="room-btn" onclick="switchRoom('random')"># random</button>
+      <button class="room-btn" onclick="switchRoom('private')"># private</button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-title">Members</div>
+      <div id="members-list"></div>
+    </div>
+
+    <div style="flex:1"></div>
+    <div class="sidebar-section">
+      <div class="section-title">Tools</div>
+      <button class="room-btn" onclick="openHistory()" style="color:var(--gold)">📜 Message History</button>
+      <button class="room-btn" onclick="openStats()" style="color:var(--accent2)">📊 Room Stats</button>
+      <button class="room-btn" onclick="disconnect()" style="color:var(--red)">⬅ Disconnect</button>
+    </div>
+  </div>
+
+  <!-- Main area -->
+  <div class="main-area">
+    <!-- Top bar -->
+    <div class="topbar">
+      <button class="topbar-menu-btn" onclick="openSidebar()">☰</button>
+      <div class="topbar-info">
+        <div class="topbar-room" id="topbar-room"># general</div>
+        <div class="topbar-status" id="topbar-status">Connected</div>
+      </div>
+      <div class="encrypt-badge">🔒 AES-256</div>
+    </div>
+
+    <!-- Messages -->
+    <div class="messages-wrap" id="messages"></div>
+
+    <!-- Typing -->
+    <div class="typing-indicator" id="typing-indicator"></div>
+
+    <!-- Input -->
+    <div class="input-area">
+      <button class="icon-btn" onclick="triggerFileUpload()" title="Share file">📎</button>
+      <button class="icon-btn" onclick="openVideoCall()" title="Video call">📹</button>
+      <input type="file" id="file-input" style="display:none" onchange="uploadFile(this)"/>
+      <textarea class="msg-input" id="msg-input" rows="1"
+                placeholder="Message (encrypted)..."
+                onkeydown="handleKey(event)"
+                oninput="handleTyping()"></textarea>
+      <button class="send-btn" onclick="sendMessage()">➤</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── VIDEO CALL MODAL ────────────────────────── -->
+<div class="modal-overlay" id="video-modal">
+  <div class="video-modal">
+    <div class="video-header">
+      <div class="video-title">📹 Video Call</div>
+      <div class="video-live"><div class="live-dot"></div> LIVE</div>
+    </div>
+    <div class="video-grid">
+      <div class="video-box">
+        <video id="local-video" autoplay muted playsinline></video>
+        <div class="video-label">You</div>
+      </div>
+      <div class="video-box">
+        <div class="video-placeholder">👤<br/>Waiting for<br/>friend...</div>
+        <div class="video-label">Friend</div>
+      </div>
+    </div>
+    <div class="video-controls">
+      <button class="ctrl-btn" id="cam-btn" onclick="toggleCam()" title="Camera">📹</button>
+      <button class="ctrl-btn" id="mic-btn" onclick="toggleMic()" title="Mic">🎤</button>
+      <button class="ctrl-btn end" onclick="endVideoCall()" title="End call">📵</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ──────────────────────────────────── -->
+<div class="toast" id="toast"></div>
+
+<!-- ── HISTORY MODAL ─────────────────────────── -->
+<div class="modal-overlay" id="history-modal" style="align-items:flex-start;padding-top:20px;">
+  <div class="video-modal" style="max-width:600px;width:100%;max-height:90dvh;display:flex;flex-direction:column;">
+    <div class="video-header">
+      <div class="video-title">📜 Message History</div>
+      <button class="ctrl-btn" onclick="closeHistory()" style="width:32px;height:32px;font-size:14px;background:var(--bg4)">✕</button>
+    </div>
+
+    <!-- Search bar -->
+    <div style="padding:12px 16px;border-bottom:1px solid var(--bg3);display:flex;gap:8px;flex-wrap:wrap;">
+      <input id="hist-sender" class="field-input" placeholder="Filter by sender" style="flex:1;min-width:120px;padding:8px 12px;font-size:13px;border-radius:8px;"/>
+      <input id="hist-from" class="field-input" type="date" style="flex:1;min-width:120px;padding:8px 12px;font-size:13px;border-radius:8px;"/>
+      <input id="hist-to" class="field-input" type="date" style="flex:1;min-width:120px;padding:8px 12px;font-size:13px;border-radius:8px;"/>
+      <button class="connect-btn" onclick="searchHistory()" style="padding:8px 16px;font-size:13px;border-radius:8px;margin-top:0;width:auto;">Search</button>
+    </div>
+
+    <!-- History list -->
+    <div id="history-list" style="flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px;"></div>
+
+    <!-- Footer -->
+    <div style="padding:10px 16px;border-top:1px solid var(--bg3);display:flex;justify-content:space-between;align-items:center;">
+      <span id="hist-count" style="font-size:12px;color:var(--dim);">Loading...</span>
+      <button class="file-dl-btn" onclick="exportHistory()">⬇ Export CSV</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── STATS MODAL ────────────────────────────── -->
+<div class="modal-overlay" id="stats-modal">
+  <div class="video-modal" style="max-width:380px;width:100%;">
+    <div class="video-header">
+      <div class="video-title">📊 Room Stats</div>
+      <button class="ctrl-btn" onclick="closeStats()" style="width:32px;height:32px;font-size:14px;background:var(--bg4)">✕</button>
+    </div>
+    <div id="stats-content" style="padding:20px;display:flex;flex-direction:column;gap:12px;"></div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────
+let socket = null;
+let currentRoom = 'general';
+let currentUser = '';
+let encryptKey = '';
+let typingTimer = null;
+let isTyping = false;
+let localStream = null;
+let camOn = true, micOn = true;
+const SERVER_URL = ''; // Will be set from input
+
+// ── AES-256 Encryption ─────────────────────────
+function encrypt(text, key) {
+  return CryptoJS.AES.encrypt(text, key).toString();
+}
+
+function decrypt(ciphertext, key) {
+  try {
+    const bytes = CryptoJS.AES.decrypt(ciphertext, key);
+    return bytes.toString(CryptoJS.enc.Utf8);
+  } catch { return '[encrypted]'; }
+}
+
+// ── Room selection ─────────────────────────────
+function selectRoom(room) {
+  document.getElementById('room-input').value = room;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+// ── Connect ────────────────────────────────────
+function connect() {
+  const serverUrl = document.getElementById('server-url').value.trim();
+  const username  = document.getElementById('username').value.trim();
+  const room      = document.getElementById('room-input').value.trim() || 'general';
+  const password  = document.getElementById('password').value.trim();
+
+  if (!serverUrl) { showError('Enter server URL'); return; }
+  if (!username)  { showError('Enter your username'); return; }
+  if (!password)  { showError('Enter room password'); return; }
+
+  currentUser = username;
+  currentRoom = room;
+  encryptKey  = password;
+
+  const btn = document.getElementById('connect-btn');
+  btn.textContent = 'Connecting...';
+  btn.classList.add('loading');
+
+  socket = io(serverUrl, { transports: ['websocket', 'polling'] });
+
+  socket.on('connect', () => {
+    socket.emit('join', { username, room, password });
+  });
+
+  socket.on('joined', ({ room: r, members, message, history }) => {
+    currentRoom = r;
+    showChatScreen();
+    updateMembers(members);
+    // Load history first
+    if (history && history.length) {
+      history.forEach(m => {
+        if (m.type === 'file') {
+          addFileMessage(m.sender, m.filename, m.file_url, m.file_size, m.timestamp, true);
+        } else {
+          addMessage(m.sender, m.encrypted ? '🔒 [Encrypted - login with same password to read]' : m.message, m.timestamp, false, true);
+        }
+      });
+      addSystemMsg(`📜 Loaded ${history.length} previous messages`);
+    }
+    addSystemMsg(message);
+    btn.textContent = 'Connect Securely →';
+    btn.classList.remove('loading');
+  });
+
+  socket.on('error', ({ message }) => {
+    showError(message);
+    btn.textContent = 'Connect Securely →';
+    btn.classList.remove('loading');
+    socket.disconnect();
+  });
+
+  socket.on('message', ({ sender, message, encrypted, timestamp, own }) => {
+    const text = encrypted ? decrypt(message, encryptKey) : message;
+    addMessage(sender, text, timestamp, own || false);
+  });
+
+  socket.on('system', ({ message, timestamp }) => {
+    addSystemMsg(`${message}`);
+  });
+
+  socket.on('members', (members) => {
+    updateMembers(members);
+  });
+
+  socket.on('file_shared', ({ sender, filename, url, size, timestamp }) => {
+    addFileMessage(sender, filename, url, size, timestamp);
+  });
+
+  socket.on('typing', ({ username: u, isTyping: t }) => {
+    const el = document.getElementById('typing-indicator');
+    el.textContent = t ? `${u} is typing...` : '';
+  });
+
+  socket.on('connect_error', () => {
+    showError('Cannot connect to server. Check the URL.');
+    btn.textContent = 'Connect Securely →';
+    btn.classList.remove('loading');
+  });
+
+  socket.on('disconnect', () => {
+    addSystemMsg('❌ Disconnected from server.');
+  });
+}
+
+// ── UI helpers ─────────────────────────────────
+function showChatScreen() {
+  document.getElementById('login-screen').style.display = 'none';
+  const chat = document.getElementById('chat-screen');
+  chat.style.display = 'flex';
+  document.getElementById('topbar-room').textContent = `# ${currentRoom}`;
+  document.getElementById('sidebar-username').textContent = currentUser;
+  document.getElementById('sidebar-avatar').textContent = currentUser[0].toUpperCase();
+  updateRoomButtons(currentRoom);
+  document.getElementById('msg-input').focus();
+}
+
+function showError(msg) {
+  document.getElementById('error-msg').textContent = msg;
+  setTimeout(() => document.getElementById('error-msg').textContent = '', 3000);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── Messages ───────────────────────────────────
+function addMessage(sender, text, timestamp, own, isHistory=false) {
+  const wrap = document.getElementById('messages');
+  const row = document.createElement('div');
+  row.className = `msg-row ${own ? 'own' : 'other'}`;
+
+  const meta = document.createElement('div');
+  meta.className = 'msg-meta';
+  meta.innerHTML = `<span class="msg-sender">${own ? 'You' : sender}</span><span>${timestamp}</span>`;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.textContent = text;
+
+  const enc = document.createElement('span');
+  enc.className = 'encrypted-tag';
+  enc.textContent = '🔒 encrypted';
+  bubble.appendChild(enc);
+
+  row.appendChild(meta);
+  row.appendChild(bubble);
+  wrap.appendChild(row);
+  scrollBottom();
+}
+
+function addSystemMsg(text) {
+  const wrap = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'system-msg';
+  div.textContent = text;
+  wrap.appendChild(div);
+  scrollBottom();
+}
+
+function addFileMessage(sender, filename, url, size, timestamp, isHistory=false) {
+  const wrap = document.getElementById('messages');
+  const card = document.createElement('div');
+  const own = !isHistory && sender === currentUser;
+  card.className = `file-card ${own ? 'own' : ''}`;
+
+  const ext = filename.split('.').pop().toLowerCase();
+  const icon = ['jpg','jpeg','png','gif','webp'].includes(ext) ? '🖼️' :
+               ['pdf'].includes(ext) ? '📄' :
+               ['mp4','mov','avi'].includes(ext) ? '🎬' :
+               ['zip','rar','7z'].includes(ext) ? '🗜️' : '📎';
+
+  card.innerHTML = `
+    <div class="file-icon">${icon}</div>
+    <div class="file-info">
+      <div class="file-name">${filename}</div>
+      <div class="file-size">${formatSize(size)} · ${timestamp}</div>
+    </div>
+    <a href="${url}" download="${filename}" class="file-dl-btn">⬇</a>
+  `;
+  wrap.appendChild(card);
+  scrollBottom();
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1024/1024).toFixed(1) + ' MB';
+}
+
+function scrollBottom() {
+  const wrap = document.getElementById('messages');
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+// ── Send message ───────────────────────────────
+function sendMessage() {
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text || !socket) return;
+
+  const encrypted = encrypt(text, encryptKey);
+  socket.emit('message', { message: encrypted, encrypted: true });
+  input.value = '';
+  input.style.height = 'auto';
+  stopTyping();
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+// ── Typing indicator ───────────────────────────
+function handleTyping() {
+  const input = document.getElementById('msg-input');
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+
+  if (!isTyping) {
+    isTyping = true;
+    socket?.emit('typing', { isTyping: true });
+  }
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(stopTyping, 1500);
+}
+
+function stopTyping() {
+  isTyping = false;
+  socket?.emit('typing', { isTyping: false });
+}
+
+// ── Members ────────────────────────────────────
+function updateMembers(members) {
+  const list = document.getElementById('members-list');
+  list.innerHTML = members.map(m => `
+    <div class="member-item">
+      <div class="member-dot"></div>
+      <div class="member-name">${m}</div>
+    </div>
+  `).join('');
+  document.getElementById('topbar-status').textContent = `${members.length} online`;
+}
+
+// ── Rooms ──────────────────────────────────────
+function switchRoom(room) {
+  if (room === currentRoom || !socket) return;
+  currentRoom = room;
+  socket.emit('join', {
+    username: currentUser,
+    room,
+    password: encryptKey
+  });
+  updateRoomButtons(room);
+  document.getElementById('topbar-room').textContent = `# ${room}`;
+  document.getElementById('messages').innerHTML = '';
+  closeSidebar();
+}
+
+function updateRoomButtons(active) {
+  document.querySelectorAll('.room-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.trim() === `# ${active}`);
+  });
+}
+
+// ── File upload ────────────────────────────────
+function triggerFileUpload() {
+  document.getElementById('file-input').click();
+}
+
+async function uploadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const serverUrl = document.getElementById('server-url').value.trim();
+  const formData = new FormData();
+  formData.append('file', file);
+
+  showToast('📤 Uploading...');
+
+  try {
+    const res = await fetch(`${serverUrl}/upload`, { method: 'POST', body: formData });
+    const data = await res.json();
+    socket.emit('file_shared', {
+      filename: data.filename,
+      fileId: data.fileId,
+      url: `${serverUrl}${data.url}`,
+      size: data.size
+    });
+    showToast('✅ File shared!');
+  } catch {
+    showToast('❌ Upload failed');
+  }
+  input.value = '';
+}
+
+// ── Sidebar ────────────────────────────────────
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('open');
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+
+// ── Video call ─────────────────────────────────
+async function openVideoCall() {
+  document.getElementById('video-modal').classList.add('open');
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    document.getElementById('local-video').srcObject = localStream;
+    addSystemMsg('📹 Video call started.');
+  } catch (e) {
+    showToast('❌ Camera not available');
+    endVideoCall();
+  }
+}
+
+function toggleCam() {
+  camOn = !camOn;
+  localStream?.getVideoTracks().forEach(t => t.enabled = camOn);
+  document.getElementById('cam-btn').classList.toggle('off', !camOn);
+  document.getElementById('cam-btn').textContent = camOn ? '📹' : '🚫';
+}
+
+function toggleMic() {
+  micOn = !micOn;
+  localStream?.getAudioTracks().forEach(t => t.enabled = micOn);
+  document.getElementById('mic-btn').classList.toggle('off', !micOn);
+  document.getElementById('mic-btn').textContent = micOn ? '🎤' : '🔇';
+}
+
+function endVideoCall() {
+  localStream?.getTracks().forEach(t => t.stop());
+  localStream = null;
+  document.getElementById('local-video').srcObject = null;
+  document.getElementById('video-modal').classList.remove('open');
+  camOn = true; micOn = true;
+  document.getElementById('cam-btn').textContent = '📹';
+  document.getElementById('mic-btn').textContent = '🎤';
+  addSystemMsg('📹 Video call ended.');
+}
+
+// ── Disconnect ─────────────────────────────────
+function disconnect() {
+  socket?.disconnect();
+  document.getElementById('chat-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('messages').innerHTML = '';
+  closeSidebar();
+}
+
+// ── History ─────────────────────────────────────
+let historyData = [];
+
+async function openHistory() {
+  document.getElementById('history-modal').classList.add('open');
+  closeSidebar();
+  await loadHistory();
+}
+
+function closeHistory() {
+  document.getElementById('history-modal').classList.remove('open');
+}
+
+async function loadHistory() {
+  const serverUrl = document.getElementById('server-url').value.trim();
+  const list = document.getElementById('history-list');
+  const count = document.getElementById('hist-count');
+  list.innerHTML = '<div style="color:var(--dim);text-align:center;padding:20px;">Loading...</div>';
+  try {
+    const res = await fetch(`${serverUrl}/api/history/${currentRoom}?limit=100`);
+    const data = await res.json();
+    historyData = data.messages;
+    renderHistory(historyData);
+    count.textContent = `${data.count} messages in #${currentRoom}`;
+  } catch {
+    list.innerHTML = '<div style="color:var(--red);text-align:center;padding:20px;">Failed to load history.<br>Make sure server URL is correct.</div>';
+  }
+}
+
+async function searchHistory() {
+  const serverUrl = document.getElementById('server-url').value.trim();
+  const sender = document.getElementById('hist-sender').value.trim();
+  const from   = document.getElementById('hist-from').value || '2000-01-01';
+  const to     = document.getElementById('hist-to').value   || '2099-12-31';
+  const list   = document.getElementById('history-list');
+  const count  = document.getElementById('hist-count');
+  list.innerHTML = '<div style="color:var(--dim);text-align:center;padding:20px;">Searching...</div>';
+  try {
+    const params = new URLSearchParams({ sender, from, to });
+    const res  = await fetch(`${serverUrl}/api/search/${currentRoom}?${params}`);
+    const data = await res.json();
+    historyData = data.messages;
+    renderHistory(historyData);
+    count.textContent = `${data.count} results found`;
+  } catch {
+    list.innerHTML = '<div style="color:var(--red);text-align:center;padding:20px;">Search failed.</div>';
+  }
+}
+
+function renderHistory(msgs) {
+  const list = document.getElementById('history-list');
+  if (!msgs.length) {
+    list.innerHTML = '<div style="color:var(--dim);text-align:center;padding:30px;">No messages found</div>';
+    return;
+  }
+  list.innerHTML = msgs.map(m => {
+    const isFile = m.type === 'file';
+    const text = isFile
+      ? `📎 <a href="${m.file_url}" target="_blank" style="color:var(--accent2)">${m.filename}</a> (${formatSize(m.file_size || 0)})`
+      : (m.encrypted ? '🔒 [Encrypted message]' : m.message);
+    return `
+      <div class="hist-item">
+        <div class="hist-sender">
+          ${m.sender}
+          <span>${m.timestamp} · ${new Date(m.created_at).toLocaleDateString()}</span>
+        </div>
+        <div class="hist-text">${text}</div>
+        ${m.encrypted && !isFile ? '<div class="hist-enc">🔒 AES-256 encrypted</div>' : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function exportHistory() {
+  if (!historyData.length) { showToast('No data to export'); return; }
+  const rows = [
+    ['ID','Room','Sender','Message','Type','Timestamp','Date'],
+    ...historyData.map(m => [
+      m.id, m.room, m.sender,
+      m.type === 'file' ? `[FILE: ${m.filename}]` : (m.encrypted ? '[ENCRYPTED]' : m.message),
+      m.type, m.timestamp, m.created_at
+    ])
+  ];
+  const csv = rows.map(r => r.map(v => `"${String(v || '').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `securechat_${currentRoom}_history.csv`;
+  a.click();
+  showToast('✅ Exported!');
+}
+
+// ── Stats ────────────────────────────────────────
+async function openStats() {
+  document.getElementById('stats-modal').classList.add('open');
+  closeSidebar();
+  const serverUrl = document.getElementById('server-url').value.trim();
+  const content = document.getElementById('stats-content');
+  content.innerHTML = '<div style="color:var(--dim);text-align:center;padding:20px;">Loading stats...</div>';
+  try {
+    const res = await fetch(`${serverUrl}/api/stats/${currentRoom}`);
+    const s = await res.json();
+    content.innerHTML = `
+      <div class="stat-card"><div><div class="stat-label">Total Messages</div><div class="stat-value">${s.total || 0}</div></div><span style="font-size:28px">💬</span></div>
+      <div class="stat-card"><div><div class="stat-label">Unique Users</div><div class="stat-value">${s.unique_users || 0}</div></div><span style="font-size:28px">👥</span></div>
+      <div class="stat-card"><div><div class="stat-label">Files Shared</div><div class="stat-value">${s.files_shared || 0}</div></div><span style="font-size:28px">📎</span></div>
+      <div class="stat-card"><div><div class="stat-label">Room</div><div class="stat-value" style="font-size:16px"># ${currentRoom}</div></div><span style="font-size:28px">🏠</span></div>
+      <div style="font-size:11px;color:var(--dim);text-align:center;padding-top:4px;">
+        First message: ${s.first_message ? new Date(s.first_message).toLocaleString() : 'N/A'}<br/>
+        Last message: ${s.last_message ? new Date(s.last_message).toLocaleString() : 'N/A'}
+      </div>
+    `;
+  } catch {
+    content.innerHTML = '<div style="color:var(--red);text-align:center;">Failed to load stats.</div>';
+  }
+}
+
+function closeStats() {
+  document.getElementById('stats-modal').classList.remove('open');
+}
+</script>
+</body>
+</html>

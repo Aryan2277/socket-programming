@@ -1,10 +1,10 @@
 """
 Smart Encrypted Chat — GUI Client (Tkinter)
-Beautiful dark-themed interface with AES-256 encryption
+AES-256 Encryption | Message History | File Sharing
 """
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, scrolledtext
+from tkinter import ttk, filedialog, messagebox
 import threading
 import os
 import json
@@ -14,10 +14,29 @@ import socket
 from datetime import datetime
 from cryptography.fernet import Fernet
 
+# ─── History File ─────────────────────────────────────────────────────────────
+HISTORY_FILE = "chat_history.json"
 
-# ─── Encryption Utilities ────────────────────────────────────────────────────
+def load_history():
+    if not os.path.exists(HISTORY_FILE):
+        return []
+    try:
+        return json.load(open(HISTORY_FILE, 'r', encoding='utf-8'))
+    except:
+        return []
+
+def save_to_history(entry: dict):
+    history = load_history()
+    history.append(entry)
+    if len(history) > 5000:
+        history = history[-5000:]
+    json.dump(history, open(HISTORY_FILE, 'w', encoding='utf-8'), indent=2)
+
+def get_room_history(room: str, limit=100):
+    return [m for m in load_history() if m.get('room') == room][-limit:]
+
+# ─── Encryption Utilities ─────────────────────────────────────────────────────
 def derive_key(password: str) -> bytes:
-    import hashlib, base64
     hashed = hashlib.sha256(password.encode()).digest()
     return base64.urlsafe_b64encode(hashed)
 
@@ -46,8 +65,7 @@ def recvall(conn, n):
         data += chunk
     return data
 
-
-# ─── Color Palette ───────────────────────────────────────────────────────────
+# ─── Color Palette ────────────────────────────────────────────────────────────
 BG       = "#0d0f14"
 BG2      = "#141720"
 BG3      = "#1c2030"
@@ -61,6 +79,7 @@ RED      = "#ff4757"
 GOLD     = "#ffd700"
 
 
+# ─── Login Window ─────────────────────────────────────────────────────────────
 class LoginWindow:
     def __init__(self):
         self.root = tk.Tk()
@@ -77,21 +96,22 @@ class LoginWindow:
         self.root.geometry(f"{w}x{h}+{x}+{y}")
 
     def _build_ui(self):
-        tk.Label(self.root, text="SecureChat", font=("Segoe UI", 18, "bold"), bg=BG, fg=ACCENT).pack(pady=(20,2))
+        tk.Label(self.root, text="🔐  SecureChat", font=("Segoe UI", 18, "bold"), bg=BG, fg=ACCENT).pack(pady=(20, 2))
         tk.Label(self.root, text="AES-256 Encrypted", font=("Segoe UI", 9), bg=BG, fg=TEXT_DIM).pack()
 
         form = tk.Frame(self.root, bg=BG2, padx=20, pady=14)
         form.pack(fill='x', padx=20, pady=12)
 
         fields = [
-            ("Server Host", "host", "127.0.0.1"),
-            ("Port",        "port", "9999"),
+            ("Server Host", "host",     "127.0.0.1"),
+            ("Port",        "port",     "9999"),
             ("Username",    "username", ""),
-            ("Room Password","password", ""),
+            ("Room Password","password",""),
         ]
         self.vars = {}
         for label, key, default in fields:
-            tk.Label(form, text=label, font=("Segoe UI", 9, "bold"), bg=BG2, fg=TEXT_DIM, anchor='w').pack(fill='x', pady=(6,1))
+            tk.Label(form, text=label, font=("Segoe UI", 9, "bold"),
+                     bg=BG2, fg=TEXT_DIM, anchor='w').pack(fill='x', pady=(6, 1))
             v = tk.StringVar(value=default)
             self.vars[key] = v
             show = "*" if key == "password" else ""
@@ -100,10 +120,10 @@ class LoginWindow:
 
         tk.Button(self.root, text="Connect Securely", font=("Segoe UI", 11, "bold"),
                   bg=ACCENT, fg="#000", activebackground="#00b894", relief='flat',
-                  pady=9, cursor='hand2', command=self._connect).pack(fill='x', padx=20, pady=(0,8))
+                  pady=9, cursor='hand2', command=self._connect).pack(fill='x', padx=20, pady=(0, 8))
 
         self.status = tk.Label(self.root, text="", font=("Segoe UI", 9), bg=BG, fg=RED)
-        self.status.pack(pady=(0,10))
+        self.status.pack(pady=(0, 10))
 
     def _connect(self):
         self.result = {k: v.get().strip() for k, v in self.vars.items()}
@@ -117,6 +137,7 @@ class LoginWindow:
         return self.result
 
 
+# ─── Chat Window ──────────────────────────────────────────────────────────────
 class ChatWindow:
     def __init__(self, config: dict):
         self.config = config
@@ -142,43 +163,59 @@ class ChatWindow:
         sidebar.pack_propagate(False)
 
         # Logo
-        logo_frame = tk.Frame(sidebar, bg=BG2, pady=20)
-        logo_frame.pack(fill='x')
-        tk.Label(logo_frame, text="🔐 SecureChat", font=("Segoe UI", 14, "bold"), bg=BG2, fg=ACCENT).pack()
-        tk.Label(logo_frame, text="AES-256 Encrypted", font=("Segoe UI", 8), bg=BG2, fg=TEXT_DIM).pack()
+        tk.Label(sidebar, text="🔐 SecureChat", font=("Segoe UI", 14, "bold"),
+                 bg=BG2, fg=ACCENT, pady=12).pack()
+        tk.Label(sidebar, text="AES-256 Encrypted", font=("Segoe UI", 8),
+                 bg=BG2, fg=TEXT_DIM).pack()
 
-        tk.Frame(sidebar, bg=BG3, height=1).pack(fill='x')
+        tk.Frame(sidebar, bg=BG3, height=1).pack(fill='x', pady=8)
 
         # User info
-        user_frame = tk.Frame(sidebar, bg=BG2, padx=15, pady=10)
+        user_frame = tk.Frame(sidebar, bg=BG2, padx=15, pady=6)
         user_frame.pack(fill='x')
-        self.user_avatar = tk.Label(user_frame, text="●", font=("Segoe UI", 14), bg=BG2, fg=ACCENT)
-        self.user_avatar.pack(side='left')
+        tk.Label(user_frame, text="●", font=("Segoe UI", 14), bg=BG2, fg=ACCENT).pack(side='left')
         user_info = tk.Frame(user_frame, bg=BG2)
         user_info.pack(side='left', padx=8)
-        tk.Label(user_info, text=self.config['username'], font=("Segoe UI", 11, "bold"), bg=BG2, fg=TEXT).pack(anchor='w')
-        self.status_label = tk.Label(user_info, text="Connecting...", font=("Segoe UI", 9), bg=BG2, fg=TEXT_DIM)
+        tk.Label(user_info, text=self.config['username'], font=("Segoe UI", 11, "bold"),
+                 bg=BG2, fg=TEXT).pack(anchor='w')
+        self.status_label = tk.Label(user_info, text="Connecting...", font=("Segoe UI", 9),
+                                     bg=BG2, fg=TEXT_DIM)
         self.status_label.pack(anchor='w')
 
-        tk.Frame(sidebar, bg=BG3, height=1).pack(fill='x', pady=10)
+        tk.Frame(sidebar, bg=BG3, height=1).pack(fill='x', pady=8)
 
         # Rooms
-        tk.Label(sidebar, text="ROOMS", font=("Segoe UI", 9, "bold"), bg=BG2, fg=TEXT_DIM, padx=15).pack(anchor='w')
+        tk.Label(sidebar, text="ROOMS", font=("Segoe UI", 9, "bold"),
+                 bg=BG2, fg=TEXT_DIM, padx=15).pack(anchor='w')
         self.room_buttons = {}
         for r in ['general', 'tech', 'random', 'private']:
-            btn = tk.Button(sidebar, text=f"# {r}", font=("Segoe UI", 11), bg=BG2, fg=TEXT_DIM,
-                            relief='flat', anchor='w', padx=20, pady=6, cursor='hand2',
-                            activebackground=BG3,
+            btn = tk.Button(sidebar, text=f"# {r}", font=("Segoe UI", 11),
+                            bg=BG2, fg=TEXT_DIM, relief='flat', anchor='w',
+                            padx=20, pady=6, cursor='hand2', activebackground=BG3,
                             command=lambda room=r: self._join_room(room))
             btn.pack(fill='x')
             self.room_buttons[r] = btn
 
-        tk.Frame(sidebar, bg=BG3, height=1).pack(fill='x', pady=10)
+        tk.Frame(sidebar, bg=BG3, height=1).pack(fill='x', pady=4)
 
         # Members
-        tk.Label(sidebar, text="MEMBERS", font=("Segoe UI", 9, "bold"), bg=BG2, fg=TEXT_DIM, padx=15).pack(anchor='w')
+        tk.Label(sidebar, text="MEMBERS", font=("Segoe UI", 9, "bold"),
+                 bg=BG2, fg=TEXT_DIM, padx=15).pack(anchor='w')
         self.members_frame = tk.Frame(sidebar, bg=BG2, padx=15)
         self.members_frame.pack(fill='x')
+
+        tk.Frame(sidebar, bg=BG3, height=1).pack(fill='x', pady=4)
+
+        # History button — always visible at bottom
+        tools_frame = tk.Frame(sidebar, bg=BG2)
+        tools_frame.pack(fill='x', side='bottom', pady=4)
+        tk.Frame(tools_frame, bg=BG3, height=1).pack(fill='x')
+        tk.Label(tools_frame, text="TOOLS", font=("Segoe UI", 9, "bold"),
+                 bg=BG2, fg=TEXT_DIM, padx=15, pady=4).pack(anchor='w')
+        tk.Button(tools_frame, text="📜 Message History", font=("Segoe UI", 11),
+                  bg=BG2, fg=GOLD, relief='flat', anchor='w', padx=20, pady=8,
+                  cursor='hand2', activebackground=BG3,
+                  command=self._open_history).pack(fill='x')
 
         # ── Main Chat Area ──
         main = tk.Frame(self.root, bg=BG)
@@ -187,15 +224,15 @@ class ChatWindow:
         # Top bar
         topbar = tk.Frame(main, bg=BG2, pady=10, padx=20)
         topbar.pack(fill='x')
-        self.room_label = tk.Label(topbar, text="# general", font=("Segoe UI", 14, "bold"), bg=BG2, fg=TEXT)
+        self.room_label = tk.Label(topbar, text="# general", font=("Segoe UI", 14, "bold"),
+                                    bg=BG2, fg=TEXT)
         self.room_label.pack(side='left')
-        self.encrypt_badge = tk.Label(topbar, text="🔒 AES-256", font=("Segoe UI", 9, "bold"),
-                                       bg=OWN_BG, fg=ACCENT, padx=8, pady=3)
-        self.encrypt_badge.pack(side='right')
+        tk.Label(topbar, text="🔒 AES-256", font=("Segoe UI", 9, "bold"),
+                 bg=OWN_BG, fg=ACCENT, padx=8, pady=3).pack(side='right')
 
         tk.Frame(main, bg=BG3, height=1).pack(fill='x')
 
-        # Messages
+        # Messages canvas
         self.msg_frame = tk.Frame(main, bg=BG)
         self.msg_frame.pack(fill='both', expand=True)
 
@@ -205,11 +242,14 @@ class ChatWindow:
         self.canvas.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side='right', fill='y')
         self.canvas.pack(side='left', fill='both', expand=True)
-        self.canvas_window = self.canvas.create_window((0,0), window=self.messages_container, anchor='nw')
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.messages_container, anchor='nw')
 
-        self.messages_container.bind("<Configure>", self._on_frame_configure)
-        self.canvas.bind("<Configure>", self._on_canvas_configure)
-        self.canvas.bind("<MouseWheel>", lambda e: self.canvas.yview_scroll(-1*(e.delta//120), "units"))
+        self.messages_container.bind("<Configure>", lambda e: self.canvas.configure(
+            scrollregion=self.canvas.bbox("all")))
+        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig(
+            self.canvas_window, width=e.width))
+        self.canvas.bind("<MouseWheel>", lambda e: self.canvas.yview_scroll(
+            -1 * (e.delta // 120), "units"))
 
         tk.Frame(main, bg=BG3, height=1).pack(fill='x')
 
@@ -217,37 +257,23 @@ class ChatWindow:
         input_area = tk.Frame(main, bg=BG2, pady=12, padx=15)
         input_area.pack(fill='x')
 
-        # File button
-        self.file_btn = tk.Button(input_area, text="📎", font=("Segoe UI Emoji", 16), bg=BG2, fg=TEXT_DIM,
-                                  relief='flat', cursor='hand2', activebackground=BG3,
-                                  command=self._send_file)
-        self.file_btn.pack(side='left', padx=(0, 8))
+        tk.Button(input_area, text="📎", font=("Segoe UI Emoji", 16), bg=BG2, fg=TEXT_DIM,
+                  relief='flat', cursor='hand2', activebackground=BG3,
+                  command=self._send_file).pack(side='left', padx=(0, 8))
 
-        # Text input
         self.input_var = tk.StringVar()
         self.input_entry = tk.Entry(input_area, textvariable=self.input_var,
                                     font=("Segoe UI", 12), bg=BG3, fg=TEXT,
                                     insertbackground=ACCENT, relief='flat', bd=10)
         self.input_entry.pack(side='left', fill='x', expand=True, ipady=8)
         self.input_entry.bind("<Return>", self._send_message)
-        self.input_entry.bind("<KeyPress>", self._on_typing)
 
-        # Send button
-        send_btn = tk.Button(input_area, text="Send →", font=("Segoe UI", 11, "bold"),
-                             bg=ACCENT, fg="#000", relief='flat', padx=16, pady=8,
-                             cursor='hand2', activebackground="#00b894",
-                             command=self._send_message)
-        send_btn.pack(side='right', padx=(8, 0))
+        tk.Button(input_area, text="Send →", font=("Segoe UI", 11, "bold"),
+                  bg=ACCENT, fg="#000", relief='flat', padx=16, pady=8,
+                  cursor='hand2', activebackground="#00b894",
+                  command=self._send_message).pack(side='right', padx=(8, 0))
 
-    def _on_frame_configure(self, event):
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-
-    def _on_canvas_configure(self, event):
-        self.canvas.itemconfig(self.canvas_window, width=event.width)
-
-    def _on_typing(self, event):
-        pass
-
+    # ── Message rendering ──────────────────────────────────────────────────────
     def _add_message(self, sender, message, timestamp, own=False, system=False):
         frame = tk.Frame(self.messages_container, bg=BG, pady=4, padx=10)
         frame.pack(fill='x', anchor='e' if own else 'w')
@@ -260,27 +286,24 @@ class ChatWindow:
         bubble = tk.Frame(frame, bg=OWN_BG if own else MSG_BG, padx=12, pady=8)
         bubble.pack(side='right' if own else 'left')
 
-        # Header
         header = tk.Frame(bubble, bg=OWN_BG if own else MSG_BG)
         header.pack(fill='x')
         tk.Label(header, text="You" if own else sender,
                  font=("Segoe UI", 9, "bold"), bg=OWN_BG if own else MSG_BG,
                  fg=ACCENT if own else ACCENT2).pack(side='left')
-        tk.Label(header, text=timestamp,
-                 font=("Segoe UI", 8), bg=OWN_BG if own else MSG_BG,
-                 fg=TEXT_DIM).pack(side='right', padx=(10, 0))
+        tk.Label(header, text=timestamp, font=("Segoe UI", 8),
+                 bg=OWN_BG if own else MSG_BG, fg=TEXT_DIM).pack(side='right', padx=(10, 0))
 
-        # Message
-        tk.Label(bubble, text=message, font=("Segoe UI", 11), bg=OWN_BG if own else MSG_BG,
-                 fg=TEXT, wraplength=500, justify='left', anchor='w').pack(fill='x', pady=(4, 0))
+        tk.Label(bubble, text=message, font=("Segoe UI", 11),
+                 bg=OWN_BG if own else MSG_BG, fg=TEXT,
+                 wraplength=500, justify='left', anchor='w').pack(fill='x', pady=(4, 0))
 
         self._scroll_bottom()
 
     def _add_file_message(self, sender, filename, size, file_id, timestamp):
         frame = tk.Frame(self.messages_container, bg=BG, pady=4, padx=10)
         frame.pack(fill='x')
-
-        bubble = tk.Frame(frame, bg=BG3, padx=12, pady=10, relief='flat')
+        bubble = tk.Frame(frame, bg=BG3, padx=12, pady=10)
         bubble.pack(side='left')
 
         top = tk.Frame(bubble, bg=BG3)
@@ -295,7 +318,6 @@ class ChatWindow:
         info.pack(side='left', padx=8)
         tk.Label(info, text=filename, font=("Segoe UI", 11, "bold"), bg=BG3, fg=TEXT).pack(anchor='w')
         tk.Label(info, text=f"{size:,} bytes", font=("Segoe UI", 9), bg=BG3, fg=TEXT_DIM).pack(anchor='w')
-
         tk.Button(file_row, text="⬇ Download", font=("Segoe UI", 9, "bold"),
                   bg=ACCENT2, fg="#fff", relief='flat', padx=8, pady=4, cursor='hand2',
                   command=lambda: self._download_file(file_id, filename)).pack(side='right')
@@ -316,43 +338,32 @@ class ChatWindow:
 
     def _update_room_buttons(self):
         for r, btn in self.room_buttons.items():
-            if r == self.room:
-                btn.config(bg=BG3, fg=TEXT)
-            else:
-                btn.config(bg=BG2, fg=TEXT_DIM)
+            btn.config(bg=BG3 if r == self.room else BG2,
+                       fg=TEXT if r == self.room else TEXT_DIM)
         self.room_label.config(text=f"# {self.room}")
 
+    # ── Connection ─────────────────────────────────────────────────────────────
     def _connect(self):
         def do_connect():
             try:
                 self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.conn.connect((self.config['host'], int(self.config['port'])))
-
-                # Receive server key
                 self.conn.recv(44)
-
-                # Derive cipher
                 self.cipher = Fernet(derive_key(self.config['password']))
-
-                # Send auth
                 auth = json.dumps({
                     "username": self.config['username'],
                     "password": self.config['password']
                 }).encode()
                 self.conn.sendall(len(auth).to_bytes(4, 'big') + auth)
-
-                # Receive handshake
                 lb = recvall(self.conn, 4)
                 raw = recvall(self.conn, int.from_bytes(lb, 'big'))
                 resp = json.loads(raw.decode())
-
                 self.running = True
                 self.root.after(0, lambda: self.status_label.config(text="● Online", fg=ACCENT))
                 self.root.after(0, lambda: self._add_message(
-                    None, resp.get('message', 'Connected!'), datetime.now().strftime('%H:%M:%S'), system=True))
-
+                    None, resp.get('message', 'Connected!'),
+                    datetime.now().strftime('%H:%M:%S'), system=True))
                 threading.Thread(target=self._listen, daemon=True).start()
-
             except Exception as e:
                 self.root.after(0, lambda: self.status_label.config(text="● Offline", fg=RED))
                 self.root.after(0, lambda: messagebox.showerror("Connection Error", str(e)))
@@ -369,15 +380,24 @@ class ChatWindow:
             ptype = packet.get('type')
 
             if ptype == 'message':
+                # Save to history only for received messages (own already saved on send)
+                if not packet.get('own', False):
+                    save_to_history({
+                        "room": self.room,
+                        "sender": packet.get('sender'),
+                        "message": packet.get('message'),
+                        "timestamp": packet.get('timestamp', ''),
+                        "own": False,
+                        "type": "text",
+                        "date": datetime.now().strftime('%Y-%m-%d')
+                    })
                 self.root.after(0, lambda p=packet: self._add_message(
-                    p.get('sender'), p.get('message'), p.get('timestamp', ''),
-                    own=p.get('own', False)
-                ))
+                    p.get('sender'), p.get('message'),
+                    p.get('timestamp', ''), own=p.get('own', False)))
 
             elif ptype == 'system':
                 self.root.after(0, lambda p=packet: self._add_message(
-                    None, p.get('message'), p.get('timestamp', ''), system=True
-                ))
+                    None, p.get('message'), p.get('timestamp', ''), system=True))
 
             elif ptype == 'room_joined':
                 self.room = packet.get('room')
@@ -388,10 +408,17 @@ class ChatWindow:
             elif ptype == 'file_available':
                 fid = packet.get('file_id')
                 self.pending_files[fid] = packet.get('filename')
+                save_to_history({
+                    "room": self.room,
+                    "sender": packet.get('sender'),
+                    "message": f"[FILE] {packet.get('filename')}",
+                    "timestamp": packet.get('timestamp', ''),
+                    "type": "file",
+                    "date": datetime.now().strftime('%Y-%m-%d')
+                })
                 self.root.after(0, lambda p=packet: self._add_file_message(
                     p.get('sender'), p.get('filename'), p.get('size', 0),
-                    p.get('file_id'), p.get('timestamp', '')
-                ))
+                    p.get('file_id'), p.get('timestamp', '')))
 
             elif ptype == 'file_download':
                 fn = packet.get('filename', 'file')
@@ -399,17 +426,28 @@ class ChatWindow:
                 path = os.path.join("downloads", fn)
                 with open(path, 'wb') as f:
                     f.write(data)
-                self.root.after(0, lambda p=path: messagebox.showinfo("Downloaded", f"File saved to:\n{p}"))
+                self.root.after(0, lambda p=path: messagebox.showinfo(
+                    "Downloaded", f"File saved to:\n{p}"))
 
+    # ── Actions ────────────────────────────────────────────────────────────────
     def _send_message(self, event=None):
         msg = self.input_var.get().strip()
         if not msg or not self.conn:
             return
         self.input_var.set("")
-        send_packet(self.conn, {
-            "type": "message",
+        ts = datetime.now().strftime('%H:%M:%S')
+        # Save own message to history immediately
+        save_to_history({
+            "room": self.room,
+            "sender": self.config['username'],
             "message": msg,
-            "room": self.room
+            "timestamp": ts,
+            "own": True,
+            "type": "text",
+            "date": datetime.now().strftime('%Y-%m-%d')
+        })
+        send_packet(self.conn, {
+            "type": "message", "message": msg, "room": self.room
         }, self.cipher)
 
     def _send_file(self):
@@ -419,10 +457,9 @@ class ChatWindow:
         def upload():
             with open(path, 'rb') as f:
                 data = f.read()
-            filename = os.path.basename(path)
             send_packet(self.conn, {
                 "type": "file_upload",
-                "filename": filename,
+                "filename": os.path.basename(path),
                 "room": self.room,
                 "data": base64.b64encode(data).decode()
             }, self.cipher)
@@ -430,14 +467,124 @@ class ChatWindow:
 
     def _download_file(self, file_id, filename):
         send_packet(self.conn, {
-            "type": "file_download",
-            "file_id": file_id
+            "type": "file_download", "file_id": file_id
         }, self.cipher)
 
     def _join_room(self, room):
         if room == self.room:
             return
         send_packet(self.conn, {"type": "join_room", "room": room}, self.cipher)
+
+    # ── Message History Window ─────────────────────────────────────────────────
+    def _open_history(self):
+        win = tk.Toplevel(self.root)
+        win.title(f"Message History — # {self.room}")
+        win.geometry("680x500")
+        win.configure(bg=BG)
+        win.resizable(True, True)
+
+        # Header
+        tk.Label(win, text=f"📜  History — # {self.room}",
+                 font=("Segoe UI", 13, "bold"), bg=BG2, fg=GOLD,
+                 pady=10, padx=16, anchor='w').pack(fill='x')
+        tk.Frame(win, bg=BG3, height=1).pack(fill='x')
+
+        # Footer — packed first so it stays visible
+        footer = tk.Frame(win, bg=BG2, pady=8, padx=12)
+        footer.pack(fill='x', side='bottom')
+        tk.Frame(win, bg=BG3, height=1).pack(fill='x', side='bottom')
+        count_lbl = tk.Label(footer, text="", font=("Segoe UI", 9), bg=BG2, fg=TEXT_DIM)
+        count_lbl.pack(side='left')
+
+        # Search bar — packed second so it stays at top
+        sf = tk.Frame(win, bg=BG3, pady=8, padx=12)
+        sf.pack(fill='x')
+        tk.Label(sf, text="Sender:", font=("Segoe UI", 9), bg=BG3, fg=TEXT_DIM).pack(side='left')
+        sender_var = tk.StringVar()
+        tk.Entry(sf, textvariable=sender_var, font=("Segoe UI", 10), bg=BG2, fg=TEXT,
+                 insertbackground=ACCENT, relief='flat', bd=4, width=14).pack(side='left', padx=(4,10), ipady=3)
+        tk.Label(sf, text="Date (YYYY-MM-DD):", font=("Segoe UI", 9), bg=BG3, fg=TEXT_DIM).pack(side='left')
+        date_var = tk.StringVar()
+        tk.Entry(sf, textvariable=date_var, font=("Segoe UI", 10), bg=BG2, fg=TEXT,
+                 insertbackground=ACCENT, relief='flat', bd=4, width=12).pack(side='left', padx=(4,10), ipady=3)
+
+        # Messages canvas — fills remaining space
+        list_frame = tk.Frame(win, bg=BG)
+        list_frame.pack(fill='both', expand=True, padx=8, pady=4)
+
+        canvas2 = tk.Canvas(list_frame, bg=BG, highlightthickness=0)
+        sb2 = ttk.Scrollbar(list_frame, orient="vertical", command=canvas2.yview)
+        inner = tk.Frame(canvas2, bg=BG)
+        canvas2.configure(yscrollcommand=sb2.set)
+        sb2.pack(side='right', fill='y')
+        canvas2.pack(side='left', fill='both', expand=True)
+        cw = canvas2.create_window((0,0), window=inner, anchor='nw')
+        inner.bind("<Configure>", lambda e: canvas2.configure(scrollregion=canvas2.bbox("all")))
+        canvas2.bind("<Configure>", lambda e: canvas2.itemconfig(cw, width=e.width))
+        canvas2.bind("<MouseWheel>", lambda e: canvas2.yview_scroll(-1*(e.delta//120), "units"))
+
+        def render(msgs):
+            for w in inner.winfo_children():
+                w.destroy()
+            if not msgs:
+                tk.Label(inner, text="No messages found.", font=("Segoe UI", 11),
+                         bg=BG, fg=TEXT_DIM).pack(pady=30)
+                count_lbl.config(text="0 messages")
+                return
+            count_lbl.config(text=f"{len(msgs)} messages")
+            for m in msgs:
+                row = tk.Frame(inner, bg=BG3, pady=6, padx=10)
+                row.pack(fill='x', pady=2, padx=4)
+                top = tk.Frame(row, bg=BG3)
+                top.pack(fill='x')
+                is_own = m.get('own', False)
+                name = "You" if is_own else m.get('sender', '?')
+                tk.Label(top, text=name, font=("Segoe UI", 9, "bold"),
+                         bg=BG3, fg=ACCENT if is_own else ACCENT2).pack(side='left')
+                tk.Label(top, text=f"{m.get('date','')}  {m.get('timestamp','')}",
+                         font=("Segoe UI", 8), bg=BG3, fg=TEXT_DIM).pack(side='right')
+                color = GOLD if m.get('type') == 'file' else TEXT
+                tk.Label(row, text=m.get('message',''), font=("Segoe UI", 10),
+                         bg=BG3, fg=color, wraplength=580, justify='left', anchor='w').pack(fill='x', pady=(2,0))
+
+        def search():
+            all_msgs = get_room_history(self.room, limit=500)
+            s = sender_var.get().strip().lower()
+            d = date_var.get().strip()
+            filtered = [m for m in all_msgs
+                        if (not s or s in m.get('sender','').lower())
+                        and (not d or m.get('date','').startswith(d))]
+            render(filtered)
+
+        def export_csv():
+            msgs = get_room_history(self.room, 500)
+            if not msgs:
+                messagebox.showinfo("Export", "No history to export.")
+                return
+            save_path = filedialog.asksaveasfilename(
+                defaultextension=".csv", filetypes=[("CSV files","*.csv")],
+                initialfile=f"history_{self.room}.csv")
+            if not save_path: return
+            import csv
+            with open(save_path, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=['date','timestamp','room','sender','message','type'])
+                writer.writeheader()
+                writer.writerows(msgs)
+            messagebox.showinfo("Exported", f"Saved to:\n{save_path}")
+
+        tk.Button(sf, text="Search", font=("Segoe UI", 9, "bold"),
+                  bg=ACCENT, fg="#000", relief='flat', padx=10, pady=3,
+                  cursor='hand2', command=search).pack(side='left')
+        tk.Button(footer, text="⬇ Export CSV", font=("Segoe UI", 9, "bold"),
+                  bg=ACCENT2, fg="#fff", relief='flat', padx=12, pady=4,
+                  cursor='hand2', command=export_csv).pack(side='right')
+        tk.Button(footer, text="🔄 Refresh", font=("Segoe UI", 9, "bold"),
+                  bg=BG3, fg=TEXT, relief='flat', padx=12, pady=4,
+                  cursor='hand2', command=search).pack(side='right', padx=8)
+
+        # Auto-load on open
+        win.after(100, search)
+
 
     def _on_close(self):
         self.running = False

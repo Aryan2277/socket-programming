@@ -1,0 +1,181 @@
+[
+  {
+    "room": "general",
+    "sender": "aryan",
+    "message": "hii",
+    "timestamp": "12:25:57",
+    "own": true,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "aryan",
+    "message": "hru",
+    "timestamp": "12:25:58",
+    "own": true,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "a",
+    "message": "hi",
+    "timestamp": "12:27:45",
+    "own": true,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "a",
+    "message": "hii",
+    "timestamp": "12:27:53",
+    "own": true,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "a",
+    "message": "hi",
+    "timestamp": "12:28:01",
+    "own": true,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "aryan",
+    "message": "hiii",
+    "timestamp": "12:28:37",
+    "own": true,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "aryan",
+    "message": "hii",
+    "timestamp": "12:30:14",
+    "own": true,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "aryan",
+    "message": "yo'",
+    "timestamp": "12:30:25",
+    "own": true,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "a",
+    "message": "hiii",
+    "timestamp": "12:33:47",
+    "own": true,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "aryan",
+    "message": "hi harsh",
+    "timestamp": "14:12:12",
+    "own": true,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "aryan",
+    "message": "hello",
+    "timestamp": "14:13:14",
+    "own": true,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "aryan",
+    "message": "hello",
+    "timestamp": "14:13:14",
+    "own": false,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "swaroop",
+    "message": "hello",
+    "timestamp": "14:13:39",
+    "own": true,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "swaroop",
+    "message": "hello",
+    "timestamp": "14:13:39",
+    "own": false,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "aryan",
+    "message": "hi aryan",
+    "timestamp": "14:16:05",
+    "own": true,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "swaroop",
+    "message": "hello!",
+    "timestamp": "14:16:45",
+    "own": true,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "swaroop",
+    "message": "hello!",
+    "timestamp": "14:16:45",
+    "own": false,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "aryan",
+    "message": "hi",
+    "timestamp": "14:17:09",
+    "own": true,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "aryan",
+    "message": "hi",
+    "timestamp": "14:17:09",
+    "own": false,
+    "type": "text",
+    "date": "2026-04-28"
+  },
+  {
+    "room": "general",
+    "sender": "mihir",
+    "message": "[FILE] car.png",
+    "timestamp": "14:17:59",
+    "type": "file",
+    "date": "2026-04-28"
+  }
+]
